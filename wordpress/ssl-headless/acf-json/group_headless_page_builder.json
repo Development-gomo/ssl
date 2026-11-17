@@ -1,0 +1,150 @@
+{
+    "key": "group_headless_page_builder",
+    "title": "Page builder",
+    "fields": [
+        {
+            "key": "field_hl_sections",
+            "label": "Page builder",
+            "name": "page_builder",
+            "type": "flexible_content",
+            "button_label": "Add section",
+            "layouts": {
+                "layout_hl_hero": {
+                    "key": "layout_hl_hero",
+                    "name": "hero_section",
+                    "label": "Hero",
+                    "display": "block",
+                    "sub_fields": [
+                        {
+                            "key": "field_hl_hero_heading",
+                            "label": "Heading",
+                            "name": "heading",
+                            "type": "text"
+                        },
+                        {
+                            "key": "field_hl_hero_text",
+                            "label": "Text",
+                            "name": "text",
+                            "type": "textarea",
+                            "rows": 3,
+                            "new_lines": ""
+                        },
+                        {
+                            "key": "field_hl_hero_image",
+                            "label": "Background image",
+                            "name": "image",
+                            "type": "image",
+                            "return_format": "array",
+                            "preview_size": "medium"
+                        },
+                        {
+                            "key": "field_hl_hero_button",
+                            "label": "Button",
+                            "name": "button",
+                            "type": "link",
+                            "return_format": "array"
+                        }
+                    ]
+                },
+                "layout_hl_text_media": {
+                    "key": "layout_hl_text_media",
+                    "name": "text_media_section",
+                    "label": "Text + media",
+                    "display": "block",
+                    "sub_fields": [
+                        {
+                            "key": "field_hl_tm_heading",
+                            "label": "Heading",
+                            "name": "heading",
+                            "type": "text"
+                        },
+                        {
+                            "key": "field_hl_tm_content",
+                            "label": "Content",
+                            "name": "content",
+                            "type": "wysiwyg",
+                            "media_upload": 0
+                        },
+                        {
+                            "key": "field_hl_tm_image",
+                            "label": "Image",
+                            "name": "image",
+                            "type": "image",
+                            "return_format": "array",
+                            "preview_size": "medium"
+                        },
+                        {
+                            "key": "field_hl_tm_position",
+                            "label": "Image position",
+                            "name": "image_position",
+                            "type": "select",
+                            "choices": {
+                                "right": "Right",
+                                "left": "Left"
+                            },
+                            "default_value": "right"
+                        }
+                    ]
+                },
+                "layout_hl_cta": {
+                    "key": "layout_hl_cta",
+                    "name": "cta_section",
+                    "label": "Call to action",
+                    "display": "block",
+                    "sub_fields": [
+                        {
+                            "key": "field_hl_cta_heading",
+                            "label": "Heading",
+                            "name": "heading",
+                            "type": "text"
+                        },
+                        {
+                            "key": "field_hl_cta_text",
+                            "label": "Text",
+                            "name": "text",
+                            "type": "textarea",
+                            "rows": 2,
+                            "new_lines": ""
+                        },
+                        {
+                            "key": "field_hl_cta_button",
+                            "label": "Button",
+                            "name": "button",
+                            "type": "link",
+                            "return_format": "array"
+                        }
+                    ]
+                }
+            }
+        }
+    ],
+    "location": [
+        [
+            {
+                "param": "post_type",
+                "operator": "==",
+                "value": "page"
+            }
+        ],
+        [
+            {
+                "param": "post_type",
+                "operator": "==",
+                "value": "project"
+            }
+        ],
+        [
+            {
+                "param": "post_type",
+                "operator": "==",
+                "value": "post"
+            }
+        ]
+    ],
+    "position": "acf_after_title",
+    "style": "default",
+    "active": true,
+    "show_in_rest": 1,
+    "modified": 1794910049,
+    "acfml_field_group_mode": "translation"
+}

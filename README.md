@@ -46,7 +46,11 @@ Same structure and conventions as the Caspeco headless site.
 ├── wordpress/
 │   ├── headless-bridge.zip              bridge plugin (Plugins → Add New → Upload)
 │   ├── headless-bridge/headless-bridge.php
-│   └── acf-page-builder-import.json     ACF "Page builder" field group (ACF → Tools → Import)
+│   ├── ssl-headless.zip                 child theme of Twenty Twenty-Five (Appearance → Themes → Upload)
+│   └── ssl-headless/
+│       ├── functions.php                ACF local JSON, image sizes, admin tweaks (comments off)
+│       ├── style.css, screenshot.png
+│       └── acf-json/                    ACF field groups as JSON — the source of truth for fields
 ├── next.config.mjs, jsconfig.json, eslint.config.mjs, postcss.config.mjs
 └── .env.example
 ```
@@ -83,7 +87,7 @@ A WordPress page with the same slug as a base (e.g. a page called "blog") takes 
 | `cta_section` | `sections/inner-pages/CtaSection.jsx` | heading, text, button |
 
 ### Add an ACF layout
-1. Add the layout to the *Page builder* field group in ACF (e.g. `testimonials_section`).
+1. Add the layout to the *Page builder* field group in ACF (e.g. `testimonials_section`). ACF writes the change to `wordpress/ssl-headless/acf-json/` on the server — copy that JSON into the repo (or edit it here and deploy the theme) so Git stays the source of truth.
 2. Create `src/components/sections/…/Testimonials.jsx` — it receives `{ data, lang }` (`data` = the layout's fields).
 3. Import it in `PageBuilder.jsx` and add a `case "testimonials_section":`.
 
@@ -145,7 +149,8 @@ The older names `WORDPRESS_URL`, `WORDPRESS_PREVIEW_USER` and `WORDPRESS_APP_PAS
    define( 'HEADLESS_REVALIDATE_SECRET', '…' );
    define( 'HEADLESS_PREVIEW_SECRET', '…' );
    ```
-4. ACF → Tools → Import → `wordpress/acf-page-builder-import.json`.
+4. Appearance → Themes → Add New → Upload → `wordpress/ssl-headless.zip` → **Activate** (Twenty Twenty-Five must stay installed — it's the parent).
+   ACF then loads the *Page builder* field group from the theme's `acf-json/`; if a copy was imported before, ACF → Field Groups shows **Sync available** → Sync.
 5. Settings → Reading → static front page; Appearance → Menus → *Primary* and *Footer*.
 
 ## Troubleshooting
@@ -153,7 +158,7 @@ The older names `WORDPRESS_URL`, `WORDPRESS_PREVIEW_USER` and `WORDPRESS_APP_PAS
 | Symptom | Check |
 |---|---|
 | Saving in WP doesn't update the site | `HEADLESS_FRONTEND_URL` and the secrets match; Vercel → Logs for `/api/revalidate` (401 = secret mismatch). |
-| `acf` is `[]` in REST responses | The field group's *Show in REST API* is off, or the entry has no field values. |
+| `acf` is `[]` in REST responses | The SSL Headless theme isn't active (field group not loaded), the group's *Show in REST API* is off, or the entry has no field values. |
 | Preview shows 404 | `WP_API_USER` / `WP_API_PASS` wrong, or the cookie was blocked (open the preview on the frontend domain). |
 | REST calls with an Application Password return `rest_not_logged_in` | The host strips `Authorization`; the bridge plugin (v1.1+) also reads `X-Authorization`, which the frontend sends. |
 | Unknown ACF layout shows a red box (dev only) | Add its component to `PageBuilder.jsx`. |
