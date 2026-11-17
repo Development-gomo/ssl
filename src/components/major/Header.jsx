@@ -1,6 +1,7 @@
 // src/components/major/Header.jsx
 // Site header: logo + primary menu (WordPress → Appearance → Menus → "Primary").
-// Menu items come from the bridge plugin (/headless/v1/settings) via Shell.
+// Menu items come from the bridge plugin (/headless/v1/settings?lang=) via Shell — WPML gives
+// each language its own menu. `alternates` feeds the SV / EN language switcher.
 // Desktop: dropdowns on hover/focus. Mobile: full-screen panel with expandable submenus.
 
 "use client";
@@ -9,6 +10,8 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { DEFAULT_LANG, langHref, langHome } from "@/config";
+import LanguageSwitcher from "@/components/ui/LanguageSwitcher";
+import { postStrings } from "@/lib/postStrings";
 
 // Normalise a menu URL: "" or "#" means "no target"
 const urlOf = (v) => {
@@ -45,8 +48,9 @@ function menuTree(items) {
     .map((item) => ({ ...item, children: list.filter((child) => child.parent === item.id) }));
 }
 
-export default function Header({ lang = DEFAULT_LANG, siteName = "SSL", menu = [] }) {
+export default function Header({ lang = DEFAULT_LANG, siteName = "SSL", menu = [], alternates = {} }) {
   const pathname = usePathname();
+  const t = postStrings(lang);
   const navItems = menuTree(menu);
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -84,8 +88,9 @@ export default function Header({ lang = DEFAULT_LANG, siteName = "SSL", menu = [
         </Link>
 
         {/* DESKTOP NAV */}
+        <div className="hidden items-center gap-8 lg:flex">
         {navItems.length > 0 && (
-          <nav aria-label="Primary" className="hidden lg:block">
+          <nav aria-label="Primary">
             <ul className="flex items-center gap-8">
               {navItems.map((item) => (
                 <li key={item.id} className="group relative">
@@ -113,21 +118,26 @@ export default function Header({ lang = DEFAULT_LANG, siteName = "SSL", menu = [
             </ul>
           </nav>
         )}
+          <LanguageSwitcher lang={lang} alternates={alternates} />
+        </div>
 
-        {/* MOBILE TOGGLE */}
+        {/* MOBILE: language switcher + menu toggle */}
+        <div className="flex items-center gap-3 lg:hidden">
+        <LanguageSwitcher lang={lang} alternates={alternates} />
         {navItems.length > 0 && (
           <button
             type="button"
-            aria-label={mobileOpen ? "Close menu" : "Open menu"}
+            aria-label={mobileOpen ? t.menuClose : t.menuOpen}
             aria-expanded={mobileOpen}
             onClick={() => setMobileOpen((v) => !v)}
-            className="flex h-10 w-10 cursor-pointer flex-col items-center justify-center gap-[5px] lg:hidden"
+            className="flex h-10 w-10 cursor-pointer flex-col items-center justify-center gap-[5px]"
           >
             <span className={`h-[2px] w-6 bg-(--color-dark) transition-transform ${mobileOpen ? "translate-y-[7px] rotate-45" : ""}`} />
             <span className={`h-[2px] w-6 bg-(--color-dark) transition-opacity ${mobileOpen ? "opacity-0" : ""}`} />
             <span className={`h-[2px] w-6 bg-(--color-dark) transition-transform ${mobileOpen ? "-translate-y-[7px] -rotate-45" : ""}`} />
           </button>
         )}
+        </div>
       </div>
 
       {/* MOBILE PANEL */}

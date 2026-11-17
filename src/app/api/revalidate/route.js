@@ -3,7 +3,9 @@
 // ACF save, menu change and site-settings change.
 //
 // Header: x-revalidate-secret (or x-revalidate-token) = REVALIDATE_SECRET
-// Body:   { restBase: "posts", slug: "hello-world", id }   → that entry + its archive + home
+// Body:   { restBase: "posts", slug: "hej", lang: "sv",
+//           translations: { en: { slug: "hello" } } }       → the entry in every language + archives + homes
+//                                                           (without lang: the slug in every language)
 //         { restBase: "pages", slug: "about", id }         → whole site (menus/child paths can change)
 //         { tags: ["settings"] }                          → whole site (menus, site title, front page)
 //         { all: true }                                   → whole site
@@ -39,11 +41,19 @@ export async function POST(req) {
   const revalidated = [];
 
   if (type && body.slug) {
-    // A post / CPT entry: its own page, its archive and the home page (it may list latest posts).
+    // A post / CPT entry: its page, its archive and the home page (it may list latest posts),
+    // in its own language and in every language it is translated to (their switchers link here).
     // Paths are the internal /{lang}/… routes (next.config.mjs rewrites the default language).
-    for (const lang of SUPPORTED_LANGS) {
+    const slugsByLang = {};
+    if (body.lang && SUPPORTED_LANGS.includes(body.lang)) slugsByLang[body.lang] = body.slug;
+    else for (const lang of SUPPORTED_LANGS) slugsByLang[lang] = body.slug;
+    for (const [lang, t] of Object.entries(body.translations && !Array.isArray(body.translations) ? body.translations : {})) {
+      if (SUPPORTED_LANGS.includes(lang) && t?.slug) slugsByLang[lang] = t.slug;
+    }
+
+    for (const [lang, slug] of Object.entries(slugsByLang)) {
       const base = ROUTE_TYPES[type].base[lang];
-      for (const path of [`/${lang}/${base}/${body.slug}`, `/${lang}/${base}`, `/${lang}`]) {
+      for (const path of [`/${lang}/${base}/${slug}`, `/${lang}/${base}`, `/${lang}`]) {
         revalidatePath(path);
         revalidated.push(path);
       }

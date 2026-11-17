@@ -2,7 +2,7 @@
 // All WordPress REST calls. Server-side only, except fetchWP which also works in the
 // browser through the /api/content proxy.
 
-import { DEFAULT_LANG, WP_BASE, ROUTE_TYPES } from "@/config";
+import { DEFAULT_LANG, SUPPORTED_LANGS, WP_BASE, ROUTE_TYPES, entryHref, langHome, langHref } from "@/config";
 import { cache } from "react";
 import { maskWp } from "@/lib/wpMask";
 
@@ -85,14 +85,16 @@ async function fetchWPAuth(endpoint) {
   }
 }
 
-// ─── Site settings (bridge plugin: /headless/v1/settings) ─────────────────────
-// { name, description, frontPage, menus: { primary: [...], footer: [...] } }
-export async function getSiteSettings() {
-  const settings = await fetchWP("/headless/v1/settings", { revalidate: 300 });
+// ─── Site settings (bridge plugin: /headless/v1/settings?lang=) ───────────────
+// { name, description, lang, languages, frontPage, menus: { primary: [...], footer: [...] } }
+// Per language: WPML returns that language's menus, translated front page and site title.
+export async function getSiteSettings(lang = DEFAULT_LANG) {
+  const settings = await fetchWP(`/headless/v1/settings?lang=${lang}`, { revalidate: 300 });
   return {
     name: settings?.name || "SSL",
     description: settings?.description || "",
     frontPage: settings?.frontPage || null,
+    languages: Array.isArray(settings?.languages) ? settings.languages : [],
     menus: settings?.menus && !Array.isArray(settings.menus) ? settings.menus : {},
   };
 }
@@ -114,7 +116,7 @@ export async function getPageBySlug(slug, lang = DEFAULT_LANG) {
 
 /** The page set under Settings → Reading → "A static page" (null when the front page shows posts). */
 export async function getFrontPage(lang = DEFAULT_LANG) {
-  const { frontPage } = await getSiteSettings();
+  const { frontPage } = await getSiteSettings(lang);
   return frontPage ? getPageBySlug(frontPage, lang) : null;
 }
 
@@ -168,7 +170,7 @@ export function getEntriesPage(type, page = 1, perPage = 12, lang = DEFAULT_LANG
 export async function getAllEntriesByType(endpoint, lang = DEFAULT_LANG) {
   const all = [];
   for (let page = 1; page <= 20; page++) {
-    const url = `${WP_BASE}/wp/v2/${endpoint}?per_page=100&page=${page}&lang=${lang}&_fields=id,slug,uri,parent,modified,date,meta`;
+    const url = `${WP_BASE}/wp/v2/${endpoint}?per_page=100&page=${page}&lang=${lang}&_fields=id,slug,uri,parent,modified,date,meta,lang`;
     const { items, totalPages } = await _fetchWPPaged(url, 300);
     all.push(...items);
     if (page >= totalPages) break;
@@ -179,6 +181,42 @@ export async function getAllEntriesByType(endpoint, lang = DEFAULT_LANG) {
 export async function getMediaById(id) {
   if (!id) return null;
   return fetchWP(`/wp/v2/media/${id}`);
+}
+
+// ─── Language alternates (switcher + hreflang) ────────────────────────────────
+// Site path of the same content in every language: { sv: "/blogg/hej", en: "/en/blog/hello" }.
+// kind: "home" | "archive" | "page" | a ROUTE_TYPES key ("post", "project" …).
+// Languages without a published translation are left out (the switcher then links to that
+// language's home page). Uses the bridge plugin's `translations` field (WPML).
+export async function getAlternates({ kind, entry = null, type = null }) {
+  if (kind === "home") {
+    return Object.fromEntries(SUPPORTED_LANGS.map((l) => [l, langHome(l)]));
+  }
+  if (kind === "archive") {
+    return Object.fromEntries(
+      SUPPORTED_LANGS.filter((l) => ROUTE_TYPES[type]?.base[l]).map((l) => [l, langHref(`/${ROUTE_TYPES[type].base[l]}`, l)]),
+    );
+  }
+
+  const translations = entry?.translations && !Array.isArray(entry.translations) ? entry.translations : {};
+  const out = {};
+
+  if (kind === "page") {
+    const settings = await Promise.all(SUPPORTED_LANGS.map((l) => getSiteSettings(l)));
+    SUPPORTED_LANGS.forEach((l, i) => {
+      const t = translations[l] || (entry?.lang === l || (!entry?.lang && l === DEFAULT_LANG) ? { slug: entry?.slug, uri: entry?.uri } : null);
+      if (!t?.slug) return;
+      const uri = (t.uri || t.slug).replace(/^\/|\/$/g, "");
+      out[l] = uri === settings[i].frontPage ? langHome(l) : langHref(`/${uri}`, l);
+    });
+    return out;
+  }
+
+  for (const l of SUPPORTED_LANGS) {
+    const t = translations[l] || (entry?.lang === l || (!entry?.lang && l === DEFAULT_LANG) ? { slug: entry?.slug } : null);
+    if (t?.slug) out[l] = entryHref(kind, t.slug, l);
+  }
+  return out;
 }
 
 // ─── Draft preview (/api/preview → /preview/[type]/[id]) ──────────────────────

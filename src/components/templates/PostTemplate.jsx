@@ -9,8 +9,10 @@ import PageBuilder from "@/components/major/PageBuilder";
 import PostCard from "@/components/ui/PostCard";
 import Shell from "./Shell";
 import { builderSections, readingMinutes } from "@/lib/content";
+import { formatDate, postStrings } from "@/lib/postStrings";
 
-export default function PostTemplate({ post, lang, banner = null }) {
+export default function PostTemplate({ post, lang, banner = null, alternates = {} }) {
+  const t = postStrings(lang);
   const image = post?._embedded?.["wp:featuredmedia"]?.[0];
   const author = post?._embedded?.author?.[0]?.name;
   const related = Array.isArray(post?.relatedPosts) ? post.relatedPosts : [];
@@ -18,7 +20,7 @@ export default function PostTemplate({ post, lang, banner = null }) {
   const contentHtml = post?.content?.rendered;
 
   return (
-    <Shell lang={lang} banner={banner}>
+    <Shell lang={lang} banner={banner} alternates={alternates}>
       {/* HERO */}
       <section className="relative isolate flex min-h-[max(55vh,380px)] items-end overflow-hidden bg-(--color-dark) text-white">
         {image?.source_url && (
@@ -30,12 +32,10 @@ export default function PostTemplate({ post, lang, banner = null }) {
         <div className="web-width mx-auto w-full space-y-4 px-5 pb-12 pt-24 lg:px-8 lg:pb-16">
           <p className="text-[15px] text-white/80">
             {post?.date && (
-              <time dateTime={post.date}>
-                {new Date(post.date).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}
-              </time>
+              <time dateTime={post.date}>{formatDate(post.date, lang)}</time>
             )}
             {author && <> · {author}</>}
-            {contentHtml && <> · {readingMinutes(contentHtml)} min read</>}
+            {contentHtml && <> · {readingMinutes(contentHtml)} {t.readSuffix}</>}
           </p>
           {post?.title?.rendered && <h1 className="ssl-h1 max-w-4xl" dangerouslySetInnerHTML={{ __html: post.title.rendered }} />}
         </div>
@@ -55,7 +55,7 @@ export default function PostTemplate({ post, lang, banner = null }) {
       {related.length > 0 && (
         <section className="bg-(--color-light-grey) py-16 lg:py-24">
           <div className="web-width mx-auto flex flex-col gap-10 px-5 lg:px-8">
-            <h2 className="ssl-h2">Related posts</h2>
+            <h2 className="ssl-h2">{t.relatedHeading}</h2>
             <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
               {related.map((relatedPost) => (
                 <PostCard key={relatedPost.id} post={relatedPost} lang={lang} />

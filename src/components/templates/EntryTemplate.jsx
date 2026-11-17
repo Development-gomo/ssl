@@ -8,7 +8,7 @@ import PageBuilder from "@/components/major/PageBuilder";
 import Shell from "./Shell";
 import { builderSections } from "@/lib/content";
 
-export default function EntryTemplate({ entry, lang, showFeaturedImage = false, banner = null }) {
+export default function EntryTemplate({ entry, lang, showFeaturedImage = false, banner = null, alternates = {} }) {
   const sections = builderSections(entry);
   const hasBuilder = sections.length > 0;
   const hasHero = sections[0]?._layout === "hero_section";
@@ -16,7 +16,7 @@ export default function EntryTemplate({ entry, lang, showFeaturedImage = false, 
   const content = entry?.content?.rendered?.trim();
 
   return (
-    <Shell lang={lang} banner={banner}>
+    <Shell lang={lang} banner={banner} alternates={alternates}>
       {!hasHero && entry?.title?.rendered && (
         <header className="bg-(--color-light-grey)">
           <div className="web-width mx-auto px-5 py-14 lg:px-8 lg:py-20">

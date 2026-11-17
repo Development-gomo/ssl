@@ -5,8 +5,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { stripHtml } from "@/lib/content";
 import { DEFAULT_LANG, entryHref } from "@/config";
+import { formatDate, postStrings } from "@/lib/postStrings";
 
-export default function PostCard({ post, type = "post", lang = DEFAULT_LANG, readMore = "Read more" }) {
+export default function PostCard({ post, type = "post", lang = DEFAULT_LANG, readMore }) {
+  const readMoreLabel = readMore || postStrings(lang).readMore;
   const image = post?._embedded?.["wp:featuredmedia"]?.[0];
   const title = stripHtml(post?.title?.rendered);
   const excerpt = stripHtml(post?.excerpt?.rendered).slice(0, 150);
@@ -22,12 +24,12 @@ export default function PostCard({ post, type = "post", lang = DEFAULT_LANG, rea
       <div className="flex flex-1 flex-col gap-3 p-6">
         {post?.date && type === "post" && (
           <time dateTime={post.date} className="text-[14px] text-(--color-muted)">
-            {new Date(post.date).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}
+            {formatDate(post.date, lang)}
           </time>
         )}
         <h3 className="text-[20px] leading-[26px] font-semibold text-(--color-dark)">{title}</h3>
         {excerpt && <p className="text-[15px] leading-[22px] text-(--color-muted)">{excerpt}</p>}
-        <span className="mt-auto pt-2 text-[15px] font-semibold text-(--color-accent)">{readMore} →</span>
+        <span className="mt-auto pt-2 text-[15px] font-semibold text-(--color-accent)">{readMoreLabel} →</span>
       </div>
     </Link>
   );

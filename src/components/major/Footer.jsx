@@ -8,7 +8,7 @@ import { DEFAULT_LANG, langHref, langHome } from "@/config";
 const isExternal = (href) => /^(https?:)?\/\//.test(href) || /^(mailto|tel):/.test(href);
 
 export default async function Footer({ lang = DEFAULT_LANG }) {
-  const settings = await getSiteSettings();
+  const settings = await getSiteSettings(lang);
   const items = (Array.isArray(settings.menus.footer) ? settings.menus.footer : []).filter((item) => !item.parent);
 
   return (

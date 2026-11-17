@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: Headless Bridge (Next.js)
- * Description: Connects WordPress to a Next.js frontend: settings/menu endpoint, on-demand revalidation, draft previews, frontend redirects and an example CPT.
- * Version:     1.1.2
+ * Description: Connects WordPress to a Next.js frontend: settings/menu endpoint, WPML languages and translations, on-demand revalidation, draft previews, frontend redirects and an example CPT.
+ * Version:     1.2.0
  *
  * Install as a normal plugin (upload the headless-bridge folder as a zip) or drop this file into wp-content/mu-plugins/, then add the constants below to wp-config.php:
  *
@@ -22,17 +22,6 @@ if ( ! defined( 'ABSPATH' ) ) {
  *    before WordPress authenticates the request. Clients may also send the
  *    same "Basic …" value in an X-Authorization header.
  * ---------------------------------------------------------------------- */
-// Snapshot (booleans only) for the temporary /headless/v1/auth-check diagnostic.
-$GLOBALS['headless_auth_seen'] = array(
-	'PHP_AUTH_USER'               => ! empty( $_SERVER['PHP_AUTH_USER'] ),
-	'HTTP_AUTHORIZATION'          => ! empty( $_SERVER['HTTP_AUTHORIZATION'] ),
-	'REDIRECT_HTTP_AUTHORIZATION' => ! empty( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ),
-	'HTTP_X_AUTHORIZATION'        => ! empty( $_SERVER['HTTP_X_AUTHORIZATION'] ),
-	'getallheaders'               => function_exists( 'getallheaders' ) ? array_values( array_filter( array_map( 'strtolower', array_keys( getallheaders() ) ), function ( $h ) {
-		return false !== strpos( $h, 'auth' );
-	} ) ) : 'unavailable',
-);
-
 if ( empty( $_SERVER['PHP_AUTH_USER'] ) ) {
 	$headless_auth = '';
 	foreach ( array( 'HTTP_AUTHORIZATION', 'REDIRECT_HTTP_AUTHORIZATION', 'HTTP_X_AUTHORIZATION' ) as $headless_key ) {
@@ -58,28 +47,6 @@ if ( empty( $_SERVER['PHP_AUTH_USER'] ) ) {
 	unset( $headless_auth, $headless_key, $headless_name, $headless_value, $headless_decoded );
 }
 
-// TEMPORARY diagnostic — reports only yes/no values, never credentials. Remove once auth works.
-add_action( 'rest_api_init', function () {
-	register_rest_route( 'headless/v1', '/auth-check', array(
-		'methods'             => 'GET',
-		'permission_callback' => '__return_true',
-		'callback'            => function () {
-			return array(
-				'plugin_version'          => '1.1.2',
-				'received_before_plugin'  => $GLOBALS['headless_auth_seen'],
-				'php_auth_user_now'       => ! empty( $_SERVER['PHP_AUTH_USER'] ),
-				'app_passwords_available' => wp_is_application_passwords_available(),
-				'is_ssl'                  => is_ssl(),
-				'current_user_id'         => get_current_user_id(),
-				'late_auth_error'         => isset( $GLOBALS['headless_late_auth_error'] ) ? $GLOBALS['headless_late_auth_error'] : null,
-				'app_password_error'      => isset( $GLOBALS['wp_rest_application_password_status'] ) && is_wp_error( $GLOBALS['wp_rest_application_password_status'] )
-					? $GLOBALS['wp_rest_application_password_status']->get_error_code()
-					: null,
-			);
-		},
-	) );
-} );
-
 /**
  * Late re-authentication: if another plugin (or a host mu-plugin) resolved the
  * current user before this plugin loaded, WordPress never saw the credentials
@@ -100,6 +67,90 @@ add_action( 'rest_api_init', function () {
 
 function headless_frontend_url() {
 	return defined( 'HEADLESS_FRONTEND_URL' ) ? untrailingslashit( HEADLESS_FRONTEND_URL ) : '';
+}
+
+/**
+ * WordPress site URL without the WPML language directory.
+ * WPML filters home_url() per language (…/ssl/en), so it can't be used to strip the host.
+ */
+function headless_wp_url() {
+	return untrailingslashit( get_option( 'siteurl' ) );
+}
+
+/* -------------------------------------------------------------------------
+ * WPML helpers — every function also works without WPML (single language).
+ * ---------------------------------------------------------------------- */
+function headless_has_wpml() {
+	return defined( 'ICL_SITEPRESS_VERSION' );
+}
+
+/** Run $callback with WPML switched to $lang (no-op without WPML or $lang). */
+function headless_in_language( $lang, $callback ) {
+	if ( ! headless_has_wpml() || ! $lang ) {
+		return $callback();
+	}
+	$previous = apply_filters( 'wpml_current_language', null );
+	do_action( 'wpml_switch_language', $lang );
+	$result = $callback();
+	do_action( 'wpml_switch_language', $previous );
+	return $result;
+}
+
+/** Language code of a post ("sv", "en"), or null without WPML. */
+function headless_post_lang( $post_id ) {
+	if ( ! headless_has_wpml() ) {
+		return null;
+	}
+	$details = apply_filters( 'wpml_post_language_details', null, $post_id );
+	return is_array( $details ) && ! empty( $details['language_code'] ) ? $details['language_code'] : null;
+}
+
+/**
+ * Published translations of a post, keyed by language:
+ * { "sv": { "id": 2, "slug": "exempelsida", "uri": "exempelsida" }, "en": { … } }
+ * (uri only for pages — the full path including parents).
+ */
+function headless_post_translations( $post_id, $post_type ) {
+	if ( ! headless_has_wpml() ) {
+		return (object) array();
+	}
+	$element_type = 'post_' . $post_type;
+	$trid         = apply_filters( 'wpml_element_trid', null, $post_id, $element_type );
+	if ( ! $trid ) {
+		return (object) array();
+	}
+	$translations = apply_filters( 'wpml_get_element_translations', null, $trid, $element_type );
+	$out          = array();
+	foreach ( (array) $translations as $code => $translation ) {
+		$id = isset( $translation->element_id ) ? (int) $translation->element_id : 0;
+		if ( ! $id || 'publish' !== get_post_status( $id ) ) {
+			continue;
+		}
+		$out[ $code ] = array(
+			'id'   => $id,
+			'slug' => get_post_field( 'post_name', $id ),
+			'uri'  => 'page' === $post_type ? get_page_uri( $id ) : null,
+		);
+	}
+	return (object) $out;
+}
+
+/** Active languages: [ { code, name, default } ], or [] without WPML. */
+function headless_languages() {
+	if ( ! headless_has_wpml() ) {
+		return array();
+	}
+	$default = apply_filters( 'wpml_default_language', null );
+	$active  = apply_filters( 'wpml_active_languages', null, array( 'skip_missing' => 0 ) );
+	$out     = array();
+	foreach ( (array) $active as $code => $language ) {
+		$out[] = array(
+			'code'    => $code,
+			'name'    => isset( $language['native_name'] ) ? $language['native_name'] : $code,
+			'default' => $code === $default,
+		);
+	}
+	return $out;
 }
 
 /* -------------------------------------------------------------------------
@@ -126,14 +177,18 @@ add_action( 'init', function () {
 } );
 
 /* -------------------------------------------------------------------------
- * 2. /wp-json/headless/v1/settings — site info, front page and menus
- *    (core's menu endpoints require authentication, this one is public)
+ * 2. /wp-json/headless/v1/settings?lang=en — site info, front page and menus
+ *    for one language (core's menu endpoints require authentication, this one
+ *    is public). Without ?lang the WPML default language is used.
  * ---------------------------------------------------------------------- */
 add_action( 'rest_api_init', function () {
 	register_rest_route( 'headless/v1', '/settings', array(
 		'methods'             => 'GET',
 		'permission_callback' => '__return_true',
 		'callback'            => 'headless_settings_endpoint',
+		'args'                => array(
+			'lang' => array( 'type' => 'string', 'sanitize_callback' => 'sanitize_key' ),
+		),
 	) );
 
 	// Page path (e.g. "about/team") so Next.js can resolve nested pages.
@@ -143,40 +198,70 @@ add_action( 'rest_api_init', function () {
 		},
 		'schema'       => array( 'type' => 'string' ),
 	) );
+
+	// WPML: language + published translations on every public post type.
+	$skip = array( 'attachment', 'nav_menu_item', 'wp_block', 'wp_template', 'wp_template_part', 'wp_navigation', 'wp_global_styles', 'wp_font_family', 'wp_font_face' );
+	foreach ( get_post_types( array( 'show_in_rest' => true ) ) as $post_type ) {
+		if ( in_array( $post_type, $skip, true ) ) {
+			continue;
+		}
+		register_rest_field( $post_type, 'lang', array(
+			'get_callback' => function ( $post ) {
+				return headless_post_lang( $post['id'] );
+			},
+			'schema'       => array( 'type' => array( 'string', 'null' ) ),
+		) );
+		register_rest_field( $post_type, 'translations', array(
+			'get_callback' => function ( $post ) {
+				return headless_post_translations( $post['id'], get_post_type( $post['id'] ) );
+			},
+			'schema'       => array( 'type' => 'object' ),
+		) );
+	}
 } );
 
-function headless_settings_endpoint() {
-	$front_id = (int) get_option( 'page_on_front' );
-	$menus    = array();
+function headless_settings_endpoint( WP_REST_Request $request ) {
+	$lang = $request->get_param( 'lang' );
 
-	foreach ( get_nav_menu_locations() as $location => $menu_id ) {
-		$items = wp_get_nav_menu_items( $menu_id );
-		$items = $items ? $items : array();
-		$menus[ $location ] = array_map( function ( $item ) {
-			return array(
-				'id'     => (int) $item->ID,
-				'parent' => (int) $item->menu_item_parent,
-				'title'  => html_entity_decode( $item->title ),
-				'url'    => headless_relative_url( $item->url ),
-				'target' => $item->target,
-			);
-		}, $items );
-	}
+	return headless_in_language( $lang, function () {
+		$front_id = (int) get_option( 'page_on_front' ); // WPML returns the translated front page
+		$menus    = array();
 
-	return array(
-		'name'        => html_entity_decode( get_bloginfo( 'name' ) ),
-		'description' => html_entity_decode( get_bloginfo( 'description' ) ),
-		'frontPage'   => $front_id ? get_post_field( 'post_name', $front_id ) : null,
-		'menus'       => (object) $menus,
-	);
+		foreach ( get_nav_menu_locations() as $location => $menu_id ) { // WPML maps to this language's menu
+			$items = wp_get_nav_menu_items( $menu_id );
+			$items = $items ? $items : array();
+			$menus[ $location ] = array_map( function ( $item ) {
+				return array(
+					'id'     => (int) $item->ID,
+					'parent' => (int) $item->menu_item_parent,
+					'title'  => html_entity_decode( $item->title ),
+					'url'    => headless_relative_url( $item->url ),
+					'target' => $item->target,
+				);
+			}, $items );
+		}
+
+		return array(
+			'name'        => html_entity_decode( get_bloginfo( 'name' ) ),
+			'description' => html_entity_decode( get_bloginfo( 'description' ) ),
+			'lang'        => headless_has_wpml() ? apply_filters( 'wpml_current_language', null ) : null,
+			'languages'   => headless_languages(),
+			'frontPage'   => $front_id ? get_post_field( 'post_name', $front_id ) : null,
+			'menus'       => (object) $menus,
+		);
+	} );
 }
 
-/** Turn absolute WP URLs into frontend-relative paths so <Link> works. */
+/**
+ * Turn absolute WP or frontend URLs into site-relative paths so <Link> works.
+ * The WPML language directory is kept: https://…/ssl/en/about/ → /en/about/
+ */
 function headless_relative_url( $url ) {
-	$home = untrailingslashit( home_url() );
-	if ( strpos( $url, $home ) === 0 ) {
-		$path = substr( $url, strlen( $home ) );
-		return $path === '' ? '/' : $path;
+	foreach ( array( headless_wp_url(), headless_frontend_url() ) as $origin ) {
+		if ( $origin && strpos( $url, $origin ) === 0 ) {
+			$path = substr( $url, strlen( $origin ) );
+			return $path === '' ? '/' : $path;
+		}
 	}
 	return $url;
 }
@@ -209,9 +294,12 @@ function headless_revalidate_post( $post ) {
 		return;
 	}
 	headless_send_revalidate( array(
-		'id'       => $post->ID,
-		'restBase' => $type->rest_base ? $type->rest_base : $post->post_type,
-		'slug'     => $post->post_name,
+		'id'           => $post->ID,
+		'restBase'     => $type->rest_base ? $type->rest_base : $post->post_type,
+		'slug'         => $post->post_name,
+		'lang'         => headless_post_lang( $post->ID ),
+		// the other languages' pages link to this one (language switcher, hreflang)
+		'translations' => headless_post_translations( $post->ID, $post->post_type ),
 	) );
 }
 
@@ -264,7 +352,9 @@ foreach ( array( 'post_link', 'page_link', 'post_type_link' ) as $headless_filte
 	add_filter( $headless_filter, function ( $url ) {
 		$frontend = headless_frontend_url();
 		if ( $frontend && ( is_admin() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) ) ) {
-			return str_replace( untrailingslashit( home_url() ), $frontend, $url );
+			// siteurl, not home_url(): WPML adds /en to home_url(), and the language
+			// directory must stay in the result (…/ssl/en/about/ → https://frontend/en/about/)
+			return str_replace( headless_wp_url(), $frontend, $url );
 		}
 		return $url;
 	}, 99 );

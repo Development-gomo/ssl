@@ -5,8 +5,10 @@
 import Link from "next/link";
 import PostCard from "@/components/ui/PostCard";
 import { DEFAULT_LANG, ROUTE_TYPES, langHref } from "@/config";
+import { postStrings } from "@/lib/postStrings";
 
 export default function NewsListing({ type = "post", items = [], page = 1, totalPages = 1, lang = DEFAULT_LANG }) {
+  const t = postStrings(lang);
   const basePath = langHref(`/${ROUTE_TYPES[type]?.base[lang] || ""}`, lang);
   const pageHref = (p) => (p <= 1 ? basePath : `${basePath}?page=${p}`);
 
@@ -14,7 +16,7 @@ export default function NewsListing({ type = "post", items = [], page = 1, total
     <section className="py-14 lg:py-20">
       <div className="web-width mx-auto px-5 lg:px-8">
         {items.length === 0 ? (
-          <p className="text-(--color-muted)">Nothing published yet.</p>
+          <p className="text-(--color-muted)">{t.empty}</p>
         ) : (
           <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
             {items.map((item) => (
@@ -26,15 +28,15 @@ export default function NewsListing({ type = "post", items = [], page = 1, total
         {totalPages > 1 && (
           <nav aria-label="Pagination" className="mt-14 flex items-center justify-between text-[15px]">
             {page > 1 ? (
-              <Link href={pageHref(page - 1)} className="font-semibold text-(--color-accent)">← Newer</Link>
+              <Link href={pageHref(page - 1)} className="font-semibold text-(--color-accent)">{t.newer}</Link>
             ) : (
               <span />
             )}
             <span className="text-(--color-muted)">
-              Page {page} of {totalPages}
+              {t.pageOf(page, totalPages)}
             </span>
             {page < totalPages ? (
-              <Link href={pageHref(page + 1)} className="font-semibold text-(--color-accent)">Older →</Link>
+              <Link href={pageHref(page + 1)} className="font-semibold text-(--color-accent)">{t.older}</Link>
             ) : (
               <span />
             )}

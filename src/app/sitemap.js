@@ -18,15 +18,16 @@ function url(lang, path) {
 
 export default async function sitemap() {
   const entries = [];
-  const { frontPage } = await getSiteSettings();
 
   for (const lang of SUPPORTED_LANGS) {
+    const { frontPage } = await getSiteSettings(lang);
     // Homepage
     entries.push({ url: lang === DEFAULT_LANG ? `${SITE_URL}/` : `${SITE_URL}/${lang}`, lastModified: new Date(), changeFrequency: "weekly", priority: 1.0 });
 
     // Pages (full path incl. parents via the bridge plugin's `uri`)
     const pages = await getAllEntriesByType("pages", lang);
     for (const page of pages) {
+      if (page.lang && page.lang !== lang) continue;
       const path = (page.uri || page.slug || "").replace(/^\/|\/$/g, "");
       if (!path || path === frontPage) continue;
       if (page.meta?.noindex === "1") continue; // Yoast noindex, renamed in lib/wpMask.js
@@ -38,6 +39,7 @@ export default async function sitemap() {
       const items = await getAllEntriesByType(rest, lang);
       if (items.length > 0) entries.push({ url: url(lang, `/${base[lang]}`), changeFrequency: "weekly", priority: 0.6 });
       for (const item of items) {
+        if (item.lang && item.lang !== lang) continue;
         if (item.meta?.noindex === "1") continue;
         entries.push({
           url: url(lang, `/${base[lang]}/${item.slug}`),

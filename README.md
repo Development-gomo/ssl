@@ -1,6 +1,8 @@
 # SSL — Headless WordPress + Next.js
 
-**Backend (WordPress):** https://gomostaging.com/ssl · **Frontend:** Next.js 16 (App Router, JSX, Tailwind v4) on Vercel
+**Backend (WordPress + WPML):** https://gomostaging.com/ssl · **Frontend:** Next.js 16 (App Router, JSX, Tailwind v4) on Vercel
+
+**Languages:** Swedish (default, no prefix: `/blogg/…`) and English (`/en/blog/…`).
 
 Same structure and conventions as the Caspeco headless site.
 
@@ -31,13 +33,14 @@ Same structure and conventions as the Caspeco headless site.
 │   │   ├── major/                       Header, Footer, PageBuilder (ACF flexible content)
 │   │   ├── templates/                   Shell, EntryTemplate, PostTemplate, ArchiveTemplate
 │   │   ├── sections/                    one component per ACF layout (home/, inner-pages/)
-│   │   └── ui/                          CtaButton, PostCard
-│   ├── config/index.js                  languages, ROUTE_TYPES (URL base per content type)
+│   │   └── ui/                          CtaButton, PostCard, LanguageSwitcher
+│   ├── config/index.js                  languages (sv, en), ROUTE_TYPES (URL base per content type and language)
 │   ├── lib/
 │   │   ├── api.js                       every WordPress REST call (fetchWP …)
 │   │   ├── wpMask.js                    hides the WP host, renames acf_fc_layout → _layout, yoast_head_json → seo
 │   │   ├── seo.js                       metadata from Yoast
 │   │   ├── content.js                   ACF field helpers
+│   │   ├── postStrings.js               UI text per language (cards, listings, post template)
 │   │   ├── params.js, notFoundMessages.js
 │   └── proxy.js                         robots.txt, WP redirects, x-lang / x-page-type headers
 ├── wordpress/
@@ -64,10 +67,10 @@ SiteGround specifics (already handled): requests send the `wpSGCacheBypass` cook
 **Pages** — WordPress pages, nested pages supported (`/about/team`).
 **Content types** — `ROUTE_TYPES` in `src/config/index.js`:
 
-| Type | WP REST base | URL |
-|---|---|---|
-| `post` | `posts` | `/blog`, `/blog/{slug}` |
-| `project` | `projects` (CPT from the bridge plugin) | `/projects`, `/projects/{slug}` |
+| Type | WP REST base | Swedish | English |
+|---|---|---|---|
+| `post` | `posts` | `/blogg`, `/blogg/{slug}` | `/en/blog`, `/en/blog/{slug}` |
+| `project` | `projects` (CPT from the bridge plugin) | `/projekt`, `/projekt/{slug}` | `/en/projects`, `/en/projects/{slug}` |
 
 A WordPress page with the same slug as a base (e.g. a page called "blog") takes over the archive URL.
 
@@ -86,11 +89,22 @@ A WordPress page with the same slug as a base (e.g. a page called "blog") takes 
 
 ### Add a custom post type
 1. Register it in WordPress with `show_in_rest => true` and a `rest_base`.
-2. Add it to `ROUTE_TYPES` in `src/config/index.js`, e.g. `service: { rest: "services", base: allLangs("services"), label: { en: "Services" } }`.
+2. Add it to `ROUTE_TYPES` in `src/config/index.js`, e.g. `service: { rest: "services", base: { sv: "tjanster", en: "services" }, label: { sv: "Tjänster", en: "Services" } }`, and make it translatable in WPML.
 3. Optional: a dedicated template in `src/components/templates/` and a `case` in `[...rest]/page.jsx` (otherwise `EntryTemplate` is used).
 
+## Languages (WPML)
+
+- WPML default language **Swedish** = `NEXT_PUBLIC_DEFAULT_LANG=sv` (no URL prefix); English under `/en`. WPML URL format: *languages in directories*.
+- Every WP request carries `lang=`; the bridge plugin returns menus, front page and site title per language (`/headless/v1/settings?lang=en`) and adds `lang` + `translations` to every entry.
+- The header's **SV / EN switcher** links to the same page in the other language (via `translations`), or to that language's home when there is no published translation. The same data produces `hreflang` links.
+- Untranslated content is **not** shown under the other language (WPML's fallback is ignored) — `/en/blog/x` is a 404 until the English translation is published.
+- Menus: create one per language in WPML (or *WPML → WP Menus Sync*) and assign it to *Primary* / *Footer*.
+- UI text that doesn't come from WordPress lives in `src/lib/postStrings.js` and `src/lib/notFoundMessages.js`.
+
 ### Add a language
-Add the code to `SUPPORTED_LANGS` and `LOCALE_MAP` in `src/config/index.js` (codes must match WPML/Polylang). Every route, the sitemap and the `lang=` query on WP requests follow automatically.
+1. Add it in WPML.
+2. `src/config/index.js`: add the code to `SUPPORTED_LANGS`, `LOCALE_MAP`, `LANG_LABELS`, and a `base` + `label` per `ROUTE_TYPES` entry.
+3. Add its strings to `src/lib/postStrings.js` and `src/lib/notFoundMessages.js`.
 
 ## Local development
 
@@ -111,6 +125,7 @@ npm run lint
 | Variable | Value |
 |---|---|
 | `NEXT_PUBLIC_WP_BASE` | `https://gomostaging.com/ssl/wp-json` |
+| `NEXT_PUBLIC_DEFAULT_LANG` | `sv` |
 | `SITE_URL` | optional, e.g. `https://sslsite.vercel.app` (defaults to the production domain) |
 | `REVALIDATE_SECRET` | same as `HEADLESS_REVALIDATE_SECRET` in wp-config.php |
 | `PREVIEW_SECRET` | same as `HEADLESS_PREVIEW_SECRET` in wp-config.php |
@@ -123,7 +138,7 @@ The older names `WORDPRESS_URL`, `WORDPRESS_PREVIEW_USER` and `WORDPRESS_APP_PAS
 ## WordPress setup
 
 1. Settings → Permalinks → *Post name*.
-2. Plugins: **ACF Pro**, **Headless Bridge** (`wordpress/headless-bridge.zip`), optionally Yoast SEO and Redirection.
+2. Plugins: **ACF Pro**, **WPML** (+ String Translation, ACF Multilingual), **Headless Bridge** v1.2+ (`wordpress/headless-bridge.zip`), optionally Yoast SEO and Redirection.
 3. `wp-config.php`:
    ```php
    define( 'HEADLESS_FRONTEND_URL', 'https://sslsite.vercel.app' );

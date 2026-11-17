@@ -6,7 +6,8 @@ import { draftMode } from "next/headers";
 import { notFound } from "next/navigation";
 import { getPreviewEntry } from "@/lib/api";
 import { resolveParams } from "@/lib/params";
-import { DEFAULT_LANG, ROUTE_TYPES, typeFromRest } from "@/config";
+import { DEFAULT_LANG, ROUTE_TYPES, SUPPORTED_LANGS, typeFromRest } from "@/config";
+import { postStrings } from "@/lib/postStrings";
 import PostTemplate from "@/components/templates/PostTemplate";
 import EntryTemplate from "@/components/templates/EntryTemplate";
 
@@ -23,20 +24,22 @@ export default async function PreviewPage({ params }) {
   const entry = await getPreviewEntry(type, Number(id));
   if (!entry) notFound();
 
+  const lang = SUPPORTED_LANGS.includes(entry.lang) ? entry.lang : DEFAULT_LANG;
+  const t = postStrings(lang);
   const banner = (
     <div className="bg-amber-100 px-5 py-2.5 text-center text-[15px] text-amber-900">
-      Preview mode — showing unpublished changes ({entry.status}).{" "}
+      {t.previewBanner} ({entry.status}).{" "}
       {/* API route (clears the draft-mode cookie), so a full request rather than <Link> */}
       {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
       <a href="/api/exit-preview" className="font-semibold underline">
-        Exit preview
+        {t.exitPreview}
       </a>
     </div>
   );
 
   return typeFromRest(type) === "post" ? (
-    <PostTemplate post={entry} lang={DEFAULT_LANG} banner={banner} />
+    <PostTemplate post={entry} lang={lang} banner={banner} />
   ) : (
-    <EntryTemplate entry={entry} lang={DEFAULT_LANG} banner={banner} showFeaturedImage={type !== "pages"} />
+    <EntryTemplate entry={entry} lang={lang} banner={banner} showFeaturedImage={type !== "pages"} />
   );
 }
