@@ -145,5 +145,6 @@ Previews and revalidation pick it up automatically (they're keyed off `POST_TYPE
 | `acf` is `[]` in REST responses | Field group → *Show in REST API* is off, or the post has no field values. |
 | Images error with "hostname not configured" | `WORDPRESS_URL` must match the host serving `/wp-content/uploads/` (CDN offload? add its host to `next.config.ts` `remotePatterns`). |
 | Updates don't appear | Check `HEADLESS_FRONTEND_URL` / secrets match; Vercel → Logs for `/api/revalidate` (401 = secret mismatch). Hosts that block outgoing requests will also block the webhook. |
+| REST calls with an Application Password return `rest_not_logged_in` | The host strips the `Authorization` header. The bridge plugin (v1.1+) also accepts `X-Authorization`, which the frontend sends automatically. |
 | Preview shows 404 | Cookie blocked (preview must be opened on the frontend domain), wrong `PREVIEW_SECRET`, or the Application Password user can't read drafts (use Editor role). |
 | `/wp-json/` returns 404 | Permalinks set to *Plain*, or a security plugin is blocking the REST API. |

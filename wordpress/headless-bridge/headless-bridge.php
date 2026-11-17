@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Headless Bridge (Next.js)
  * Description: Connects WordPress to a Next.js frontend: settings/menu endpoint, on-demand revalidation, draft previews, frontend redirects and an example CPT.
- * Version:     1.0.0
+ * Version:     1.1.0
  *
  * Install as a normal plugin (upload the headless-bridge folder as a zip) or drop this file into wp-content/mu-plugins/, then add the constants below to wp-config.php:
  *
@@ -14,6 +14,37 @@
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
+}
+
+/* -------------------------------------------------------------------------
+ * 0. Application Password fallback for hosts that strip the Authorization
+ *    header (common on SiteGround / Apache + PHP-FPM). Runs at load time,
+ *    before WordPress authenticates the request. Clients may also send the
+ *    same "Basic …" value in an X-Authorization header.
+ * ---------------------------------------------------------------------- */
+if ( empty( $_SERVER['PHP_AUTH_USER'] ) ) {
+	$headless_auth = '';
+	foreach ( array( 'HTTP_AUTHORIZATION', 'REDIRECT_HTTP_AUTHORIZATION', 'HTTP_X_AUTHORIZATION' ) as $headless_key ) {
+		if ( ! empty( $_SERVER[ $headless_key ] ) ) {
+			$headless_auth = $_SERVER[ $headless_key ];
+			break;
+		}
+	}
+	if ( ! $headless_auth && function_exists( 'getallheaders' ) ) {
+		foreach ( getallheaders() as $headless_name => $headless_value ) {
+			if ( in_array( strtolower( $headless_name ), array( 'authorization', 'x-authorization' ), true ) ) {
+				$headless_auth = $headless_value;
+				break;
+			}
+		}
+	}
+	if ( $headless_auth && 0 === stripos( $headless_auth, 'basic ' ) ) {
+		$headless_decoded = base64_decode( substr( $headless_auth, 6 ), true );
+		if ( $headless_decoded && false !== strpos( $headless_decoded, ':' ) ) {
+			list( $_SERVER['PHP_AUTH_USER'], $_SERVER['PHP_AUTH_PW'] ) = explode( ':', $headless_decoded, 2 );
+		}
+	}
+	unset( $headless_auth, $headless_key, $headless_name, $headless_value, $headless_decoded );
 }
 
 function headless_frontend_url() {

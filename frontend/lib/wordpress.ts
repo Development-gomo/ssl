@@ -35,7 +35,9 @@ function previewAuthHeader(): Record<string, string> {
   if (!user || !pass) {
     throw new Error("WORDPRESS_PREVIEW_USER / WORDPRESS_APP_PASSWORD are required for previews");
   }
-  return { Authorization: `Basic ${Buffer.from(`${user}:${pass}`).toString("base64")}` };
+  const value = `Basic ${Buffer.from(`${user}:${pass}`).toString("base64")}`;
+  // X-Authorization is a fallback for hosts that strip Authorization (handled by the bridge plugin).
+  return { Authorization: value, "X-Authorization": value };
 }
 
 export async function wpFetch<T>(path: string, opts: FetchOptions = {}): Promise<WPResponse<T>> {
