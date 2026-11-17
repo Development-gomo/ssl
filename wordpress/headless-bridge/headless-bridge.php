@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Headless Bridge (Next.js)
  * Description: Connects WordPress to a Next.js frontend: settings/menu endpoint, on-demand revalidation, draft previews, frontend redirects and an example CPT.
- * Version:     1.1.0
+ * Version:     1.1.1
  *
  * Install as a normal plugin (upload the headless-bridge folder as a zip) or drop this file into wp-content/mu-plugins/, then add the constants below to wp-config.php:
  *
@@ -22,6 +22,17 @@ if ( ! defined( 'ABSPATH' ) ) {
  *    before WordPress authenticates the request. Clients may also send the
  *    same "Basic …" value in an X-Authorization header.
  * ---------------------------------------------------------------------- */
+// Snapshot (booleans only) for the temporary /headless/v1/auth-check diagnostic.
+$GLOBALS['headless_auth_seen'] = array(
+	'PHP_AUTH_USER'               => ! empty( $_SERVER['PHP_AUTH_USER'] ),
+	'HTTP_AUTHORIZATION'          => ! empty( $_SERVER['HTTP_AUTHORIZATION'] ),
+	'REDIRECT_HTTP_AUTHORIZATION' => ! empty( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ),
+	'HTTP_X_AUTHORIZATION'        => ! empty( $_SERVER['HTTP_X_AUTHORIZATION'] ),
+	'getallheaders'               => function_exists( 'getallheaders' ) ? array_values( array_filter( array_map( 'strtolower', array_keys( getallheaders() ) ), function ( $h ) {
+		return false !== strpos( $h, 'auth' );
+	} ) ) : 'unavailable',
+);
+
 if ( empty( $_SERVER['PHP_AUTH_USER'] ) ) {
 	$headless_auth = '';
 	foreach ( array( 'HTTP_AUTHORIZATION', 'REDIRECT_HTTP_AUTHORIZATION', 'HTTP_X_AUTHORIZATION' ) as $headless_key ) {
@@ -46,6 +57,27 @@ if ( empty( $_SERVER['PHP_AUTH_USER'] ) ) {
 	}
 	unset( $headless_auth, $headless_key, $headless_name, $headless_value, $headless_decoded );
 }
+
+// TEMPORARY diagnostic — reports only yes/no values, never credentials. Remove once auth works.
+add_action( 'rest_api_init', function () {
+	register_rest_route( 'headless/v1', '/auth-check', array(
+		'methods'             => 'GET',
+		'permission_callback' => '__return_true',
+		'callback'            => function () {
+			return array(
+				'plugin_version'          => '1.1.1',
+				'received_before_plugin'  => $GLOBALS['headless_auth_seen'],
+				'php_auth_user_now'       => ! empty( $_SERVER['PHP_AUTH_USER'] ),
+				'app_passwords_available' => wp_is_application_passwords_available(),
+				'is_ssl'                  => is_ssl(),
+				'current_user_id'         => get_current_user_id(),
+				'app_password_error'      => isset( $GLOBALS['wp_rest_application_password_status'] ) && is_wp_error( $GLOBALS['wp_rest_application_password_status'] )
+					? $GLOBALS['wp_rest_application_password_status']->get_error_code()
+					: null,
+			);
+		},
+	) );
+} );
 
 function headless_frontend_url() {
 	return defined( 'HEADLESS_FRONTEND_URL' ) ? untrailingslashit( HEADLESS_FRONTEND_URL ) : '';
