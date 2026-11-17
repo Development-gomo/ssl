@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Headless Bridge (Next.js)
  * Description: Connects WordPress to a Next.js frontend: settings/menu endpoint, on-demand revalidation, draft previews, frontend redirects and an example CPT.
- * Version:     1.1.1
+ * Version:     1.1.2
  *
  * Install as a normal plugin (upload the headless-bridge folder as a zip) or drop this file into wp-content/mu-plugins/, then add the constants below to wp-config.php:
  *
@@ -65,12 +65,13 @@ add_action( 'rest_api_init', function () {
 		'permission_callback' => '__return_true',
 		'callback'            => function () {
 			return array(
-				'plugin_version'          => '1.1.1',
+				'plugin_version'          => '1.1.2',
 				'received_before_plugin'  => $GLOBALS['headless_auth_seen'],
 				'php_auth_user_now'       => ! empty( $_SERVER['PHP_AUTH_USER'] ),
 				'app_passwords_available' => wp_is_application_passwords_available(),
 				'is_ssl'                  => is_ssl(),
 				'current_user_id'         => get_current_user_id(),
+				'late_auth_error'         => isset( $GLOBALS['headless_late_auth_error'] ) ? $GLOBALS['headless_late_auth_error'] : null,
 				'app_password_error'      => isset( $GLOBALS['wp_rest_application_password_status'] ) && is_wp_error( $GLOBALS['wp_rest_application_password_status'] )
 					? $GLOBALS['wp_rest_application_password_status']->get_error_code()
 					: null,
@@ -78,6 +79,24 @@ add_action( 'rest_api_init', function () {
 		},
 	) );
 } );
+
+/**
+ * Late re-authentication: if another plugin (or a host mu-plugin) resolved the
+ * current user before this plugin loaded, WordPress never saw the credentials
+ * set above. Validate the Application Password again once the REST request
+ * is known, so permission checks see the right user.
+ */
+add_action( 'rest_api_init', function () {
+	if ( is_user_logged_in() || empty( $_SERVER['PHP_AUTH_USER'] ) || ! function_exists( 'wp_authenticate_application_password' ) ) {
+		return;
+	}
+	$user = wp_authenticate_application_password( null, $_SERVER['PHP_AUTH_USER'], isset( $_SERVER['PHP_AUTH_PW'] ) ? $_SERVER['PHP_AUTH_PW'] : '' );
+	if ( $user instanceof WP_User ) {
+		wp_set_current_user( $user->ID );
+	} elseif ( is_wp_error( $user ) ) {
+		$GLOBALS['headless_late_auth_error'] = $user->get_error_code();
+	}
+}, 0 );
 
 function headless_frontend_url() {
 	return defined( 'HEADLESS_FRONTEND_URL' ) ? untrailingslashit( HEADLESS_FRONTEND_URL ) : '';
