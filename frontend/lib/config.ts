@@ -16,5 +16,9 @@ export function isRestBase(value: string): value is RestBase {
 }
 
 export const WORDPRESS_URL = (process.env.WORDPRESS_URL ?? "").replace(/\/$/, "");
-export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(/\/$/, "");
+/** Server-only (no NEXT_PUBLIC_ prefix). Falls back to Vercel's production URL when unset. */
+export const SITE_URL = (
+  process.env.SITE_URL ??
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000")
+).replace(/\/$/, "");
 export const REVALIDATE_SECONDS = Number(process.env.WP_REVALIDATE_SECONDS ?? 3600);

@@ -86,7 +86,7 @@ npm run dev                  # http://localhost:3000
 | Variable | Value |
 |---|---|
 | `WORDPRESS_URL` | `https://gomostaging.com/ssl` (no trailing slash) |
-| `NEXT_PUBLIC_SITE_URL` | your Vercel URL, e.g. `https://ssl.vercel.app` (update when the real domain is added) |
+| `SITE_URL` | optional — your site URL, e.g. `https://ssl.vercel.app`; defaults to the Vercel production URL. Not secret, no need to mark Sensitive |
 | `REVALIDATE_SECRET` | same as `HEADLESS_REVALIDATE_SECRET` |
 | `PREVIEW_SECRET` | same as `HEADLESS_PREVIEW_SECRET` |
 | `WORDPRESS_PREVIEW_USER` | the preview user's username |
