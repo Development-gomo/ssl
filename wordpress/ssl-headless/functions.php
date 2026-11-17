@@ -1,6 +1,7 @@
 <?php
 /**
- * SSL Headless — child theme of Twenty Twenty-Five.
+ * SSL Headless — child theme of BlankSlate (https://wordpress.org/themes/blankslate/),
+ * a blank classic theme: no styles, no block templates — nothing that competes with Next.js.
  *
  * WordPress is only the CMS: Next.js (repo root, deployed on Vercel) renders the site.
  * What lives here is site-specific setup:
@@ -67,8 +68,8 @@ add_action( 'wp_before_admin_bar_render', function () {
 	$wp_admin_bar->remove_menu( 'comments' );
 } );
 
-// The Site Editor edits the WordPress theme's own templates, which visitors never see —
-// hide it so editors don't change things that have no effect.
+// If a block theme is ever used as parent, its Site Editor edits templates visitors never see —
+// hide it so editors don't change things that have no effect (no-op with BlankSlate).
 add_action( 'admin_menu', function () {
 	remove_submenu_page( 'themes.php', 'site-editor.php' );
 }, 100 );

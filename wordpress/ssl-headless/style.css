@@ -1,10 +1,10 @@
 /*
 Theme Name:   SSL Headless
 Theme URI:    https://sslsite.vercel.app
-Description:  Child theme of Twenty Twenty-Five for the headless SSL site. The public site is rendered by Next.js on Vercel; this theme only serves the WordPress admin/editor and keeps site-specific setup (ACF field groups as JSON, image sizes, editor tweaks) in version control.
+Description:  Child theme of BlankSlate for the headless SSL site. The public site is rendered by Next.js on Vercel; this theme only serves the WordPress admin/editor and keeps site-specific setup (ACF field groups as JSON, image sizes, editor tweaks) in version control.
 Author:       GO MO Group
-Template:     twentytwentyfive
-Version:      1.0.0
+Template:     blankslate
+Version:      1.1.0
 Requires at least: 6.5
 Requires PHP: 7.4
 License:      GPL-2.0-or-later

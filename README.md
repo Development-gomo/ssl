@@ -46,7 +46,7 @@ Same structure and conventions as the Caspeco headless site.
 ├── wordpress/
 │   ├── headless-bridge.zip              bridge plugin (Plugins → Add New → Upload)
 │   ├── headless-bridge/headless-bridge.php
-│   ├── ssl-headless.zip                 child theme of Twenty Twenty-Five (Appearance → Themes → Upload)
+│   ├── ssl-headless.zip                 child theme of BlankSlate (Appearance → Themes → Upload)
 │   └── ssl-headless/
 │       ├── functions.php                ACF local JSON, image sizes, admin tweaks (comments off)
 │       ├── style.css, screenshot.png
@@ -149,7 +149,7 @@ The older names `WORDPRESS_URL`, `WORDPRESS_PREVIEW_USER` and `WORDPRESS_APP_PAS
    define( 'HEADLESS_REVALIDATE_SECRET', '…' );
    define( 'HEADLESS_PREVIEW_SECRET', '…' );
    ```
-4. Appearance → Themes → Add New → Upload → `wordpress/ssl-headless.zip` → **Activate** (Twenty Twenty-Five must stay installed — it's the parent).
+4. Appearance → Themes → Add New → Upload → `wordpress/ssl-headless.zip` → **Activate** (install the parent **BlankSlate** first: Appearance → Themes → Add New → search "BlankSlate" → Install; don't activate it).
    ACF then loads the *Page builder* field group from the theme's `acf-json/`; if a copy was imported before, ACF → Field Groups shows **Sync available** → Sync.
 5. Settings → Reading → static front page; Appearance → Menus → *Primary* and *Footer*.
 
