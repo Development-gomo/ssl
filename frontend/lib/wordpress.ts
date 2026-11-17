@@ -49,7 +49,13 @@ export async function wpFetch<T>(path: string, opts: FetchOptions = {}): Promise
   }
 
   const res = await fetch(url, {
-    headers: { Accept: "application/json", ...(opts.preview ? previewAuthHeader() : {}) },
+    headers: {
+      Accept: "application/json",
+      // Skip SiteGround's page cache: Next.js caches these responses itself and
+      // refetches only after a revalidation webhook, which must see fresh data.
+      Cookie: "wpSGCacheBypass=1",
+      ...(opts.preview ? previewAuthHeader() : {}),
+    },
     ...(opts.preview
       ? { cache: "no-store" as const }
       : { next: { revalidate: REVALIDATE_SECONDS, tags: [tags.all, ...(opts.tags ?? [])] } }),
