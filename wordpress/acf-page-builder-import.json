@@ -5,14 +5,14 @@
         "fields": [
             {
                 "key": "field_hl_sections",
-                "label": "Sections",
-                "name": "sections",
+                "label": "Page builder",
+                "name": "page_builder",
                 "type": "flexible_content",
                 "button_label": "Add section",
                 "layouts": {
                     "layout_hl_hero": {
                         "key": "layout_hl_hero",
-                        "name": "hero",
+                        "name": "hero_section",
                         "label": "Hero",
                         "display": "block",
                         "sub_fields": [
@@ -49,7 +49,7 @@
                     },
                     "layout_hl_text_media": {
                         "key": "layout_hl_text_media",
-                        "name": "text_media",
+                        "name": "text_media_section",
                         "label": "Text + media",
                         "display": "block",
                         "sub_fields": [
@@ -89,7 +89,7 @@
                     },
                     "layout_hl_cta": {
                         "key": "layout_hl_cta",
-                        "name": "cta",
+                        "name": "cta_section",
                         "label": "Call to action",
                         "display": "block",
                         "sub_fields": [
@@ -132,6 +132,13 @@
                     "param": "post_type",
                     "operator": "==",
                     "value": "project"
+                }
+            ],
+            [
+                {
+                    "param": "post_type",
+                    "operator": "==",
+                    "value": "post"
                 }
             ]
         ],

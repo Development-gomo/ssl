@@ -1,151 +1,144 @@
 # SSL — Headless WordPress + Next.js
 
-**Backend (WordPress):** https://gomostaging.com/ssl · **Frontend:** Next.js on Vercel (root directory `frontend`)
+**Backend (WordPress):** https://gomostaging.com/ssl · **Frontend:** Next.js 16 (App Router, JSX, Tailwind v4) on Vercel
 
-
-WordPress is the CMS (editors keep the admin they know). Next.js 16 (App Router) renders the public site on Vercel and reads content over the **WP REST API**. Pages are statically generated and refreshed **instantly on publish** via a webhook; editors' **Preview** button shows drafts on the real frontend.
+Same structure and conventions as the Caspeco headless site.
 
 ```
-headless-wp-next/
+├── public/                              static files (icons, images)
+├── src/
+│   ├── app/
+│   │   ├── layout.js                    <html>/<body>, font, body class (page type)
+│   │   ├── globals.css                  Tailwind v4 + brand tokens + .ssl-content (WP editor HTML)
+│   │   ├── error.jsx, not-found.jsx     global error / 404
+│   │   ├── robots.js, sitemap.js
+│   │   ├── [lang]/
+│   │   │   ├── layout.js                pass-through
+│   │   │   ├── not-found.jsx            404 inside the site shell
+│   │   │   ├── page.jsx                 home = WP static front page (else latest posts)
+│   │   │   └── [slug]/
+│   │   │       ├── page.jsx             top-level page (/about) or archive (/blog, /projects)
+│   │   │       └── [...rest]/page.jsx   single entry (/blog/x, /projects/x) or child page (/about/team)
+│   │   ├── api/
+│   │   │   ├── revalidate/route.js      webhook WordPress calls on save
+│   │   │   ├── content/[...path]/route.js  same-origin WP REST proxy for the browser
+│   │   │   ├── wp-redirects/route.js    redirects from the WP "Redirection" plugin
+│   │   │   ├── preview/route.js         WP "Preview" button → draft mode
+│   │   │   └── exit-preview/route.js
+│   │   └── preview/[type]/[id]/page.jsx draft preview (never cached/indexed)
+│   ├── components/
+│   │   ├── LangSyncer.jsx               keeps <html lang> + body class in sync on navigation
+│   │   ├── major/                       Header, Footer, PageBuilder (ACF flexible content)
+│   │   ├── templates/                   Shell, EntryTemplate, PostTemplate, ArchiveTemplate
+│   │   ├── sections/                    one component per ACF layout (home/, inner-pages/)
+│   │   └── ui/                          CtaButton, PostCard
+│   ├── config/index.js                  languages, ROUTE_TYPES (URL base per content type)
+│   ├── lib/
+│   │   ├── api.js                       every WordPress REST call (fetchWP …)
+│   │   ├── wpMask.js                    hides the WP host, renames acf_fc_layout → _layout, yoast_head_json → seo
+│   │   ├── seo.js                       metadata from Yoast
+│   │   ├── content.js                   ACF field helpers
+│   │   ├── params.js, notFoundMessages.js
+│   └── proxy.js                         robots.txt, WP redirects, x-lang / x-page-type headers
 ├── wordpress/
-│   ├── headless-bridge.zip              ← the bridge plugin (Plugins → Add New → Upload)
-│   ├── headless-bridge/headless-bridge.php  (source of the zip)
-│   └── acf-page-builder-import.json     ← example ACF flexible-content field group
-└── frontend/                            ← Next.js app (deploy to Vercel)
-    ├── app/
-    │   ├── page.tsx                     front page (Settings → Reading)
-    │   ├── [...slug]/page.tsx           WP pages, incl. nested (/about/team)
-    │   ├── blog/ , projects/            archives + singles (posts, "project" CPT)
-    │   ├── preview/[type]/[id]/         draft preview (draft mode only)
-    │   ├── api/revalidate               webhook WordPress calls on save
-    │   ├── api/preview, api/exit-preview
-    │   └── sitemap.ts, robots.ts
-    ├── components/blocks/               one React component per ACF layout
-    └── lib/
-        ├── config.ts                    post types ↔ routes
-        ├── wordpress.ts                 REST client, cache tags, helpers
-        ├── routes.tsx                   archive/single route factories
-        └── seo.ts                       metadata (uses Yoast if installed)
+│   ├── headless-bridge.zip              bridge plugin (Plugins → Add New → Upload)
+│   ├── headless-bridge/headless-bridge.php
+│   └── acf-page-builder-import.json     ACF "Page builder" field group (ACF → Tools → Import)
+├── next.config.mjs, jsconfig.json, eslint.config.mjs, postcss.config.mjs
+└── .env.example
 ```
 
-## How it fits together
+## How it works
 
 | Flow | What happens |
 |---|---|
-| **Visitor** | Next.js serves static HTML. Data is fetched from `/wp-json/...` at build or on first request and cached with tags. |
-| **Editor publishes / updates / trashes** | mu-plugin → `POST /api/revalidate` with `{restBase, slug}` → Next.js expires `type:<restBase>` and `<restBase>:<slug>` → next request gets fresh content. Menu and site-title changes expire the `settings` tag. A 1-hour time-based refresh is the safety net. |
-| **Editor clicks Preview** | WP links to `/api/preview?secret&id&type` → draft mode cookie → `/preview/<type>/<id>` fetches the draft (and newest autosave) with an Application Password. Never cached or indexed. |
-| **Someone opens the old WP theme URL** | Optional 301 to the same path on the frontend (`HEADLESS_REDIRECT_FRONTEND`). |
+| **Visitor** | `next.config.mjs` rewrites `/x` → `/en/x` (default language has no prefix). Pages render on the server; WordPress responses are cached (`fetchWP`, 60 s) and masked so the WP host never reaches the browser. |
+| **Editor saves in WP** | Bridge plugin → `POST /api/revalidate` → the changed post's page + its archive + home (posts/CPTs), or the whole site (pages, menus, settings). The next visit shows the change. |
+| **Editor clicks Preview** | `/api/preview?secret&id&type` → draft mode cookie → `/preview/{type}/{id}` reads the draft/autosave with the Application Password. |
+| **Redirects** | Managed in WP with the Redirection plugin (optional); `src/proxy.js` applies them. |
 
----
+SiteGround specifics (already handled): requests send the `wpSGCacheBypass` cookie so SiteGround's cache never serves stale JSON, and the Application Password goes in `X-Authorization` too because SiteGround strips `Authorization`.
 
-## 1. WordPress (backend)
+## Content model
 
-WordPress runs at `https://gomostaging.com/ssl` (subfolder installs are supported).
+**Pages** — WordPress pages, nested pages supported (`/about/team`).
+**Content types** — `ROUTE_TYPES` in `src/config/index.js`:
 
-1. **Permalinks:** Settings → Permalinks → *Post name*. (Required for `/wp-json/`.)
-2. **Plugins:**
-   - **ACF Pro** (or ACF free if you don't need flexible content)
-   - **Yoast SEO** (optional — its `yoast_head_json` is used for titles/descriptions/OG automatically)
-3. **Bridge plugin:** Plugins → Add New → Upload Plugin → `wordpress/headless-bridge.zip` → Activate.
-   (Alternatively copy `headless-bridge.php` into `wp-content/mu-plugins/` so it can't be deactivated.)
-   It adds:
-   - `GET /wp-json/headless/v1/settings` — site name, front page and menus (core's menu endpoint needs auth)
-   - `uri` field on pages (full path for nested pages)
-   - revalidation webhook on publish/update/trash, ACF save and menu/settings changes
-   - Preview button → Next.js draft mode
-   - "View post" links pointing to the frontend
-   - example `project` CPT (`rest_base: projects`) and `primary` / `footer` menu locations
-4. **wp-config.php** — add above `/* That's all, stop editing! */`:
+| Type | WP REST base | URL |
+|---|---|---|
+| `post` | `posts` | `/blog`, `/blog/{slug}` |
+| `project` | `projects` (CPT from the bridge plugin) | `/projects`, `/projects/{slug}` |
 
-   ```php
-   define( 'HEADLESS_FRONTEND_URL', 'https://your-project.vercel.app' ); // your Vercel URL / domain
-   define( 'HEADLESS_REVALIDATE_SECRET', 'paste-a-long-random-string' );
-   define( 'HEADLESS_PREVIEW_SECRET', 'paste-another-long-random-string' );
-   define( 'HEADLESS_REDIRECT_FRONTEND', true ); // optional, enable once the frontend is live
-   ```
-   Generate secrets with `openssl rand -hex 32`.
-5. **ACF field group:** ACF → Tools → Import → `acf-page-builder-import.json`. It creates a *Page builder* flexible content field (`sections`) with **Hero**, **Text + media** and **CTA** layouts on Pages and Projects, with **Show in REST API** enabled.
-   For your own field groups: enable **Show in REST API** in the group settings, and use the *Array* return format for images and links.
-6. **Front page & menus:** Settings → Reading → *A static page*. Appearance → Menus → assign menus to *Primary* and *Footer*.
-7. **Preview user:** create a user with the **Editor** role (e.g. `preview-bot`), then Users → Profile → **Application Passwords** → create one. You'll paste it into Vercel. (Application Passwords require HTTPS on the WP site.)
+A WordPress page with the same slug as a base (e.g. a page called "blog") takes over the archive URL.
 
-Quick check: `https://gomostaging.com/ssl/wp-json/headless/v1/settings` and `https://gomostaging.com/ssl/wp-json/wp/v2/pages?acf_format=standard` should both return JSON, the latter with an `acf.sections` array.
+**ACF Page builder** — flexible content field `page_builder` on pages, posts and projects. Layouts → components (`src/components/major/PageBuilder.jsx`):
 
-## 2. Next.js (frontend) — local
+| ACF layout | Component | Fields |
+|---|---|---|
+| `hero_section` | `sections/home/HomeHero.jsx` | heading, text, image, button |
+| `text_media_section` | `sections/inner-pages/TextMedia.jsx` | heading, content, image, image_position |
+| `cta_section` | `sections/inner-pages/CtaSection.jsx` | heading, text, button |
 
-Requires Node 20.9+.
+### Add an ACF layout
+1. Add the layout to the *Page builder* field group in ACF (e.g. `testimonials_section`).
+2. Create `src/components/sections/…/Testimonials.jsx` — it receives `{ data, lang }` (`data` = the layout's fields).
+3. Import it in `PageBuilder.jsx` and add a `case "testimonials_section":`.
+
+### Add a custom post type
+1. Register it in WordPress with `show_in_rest => true` and a `rest_base`.
+2. Add it to `ROUTE_TYPES` in `src/config/index.js`, e.g. `service: { rest: "services", base: allLangs("services"), label: { en: "Services" } }`.
+3. Optional: a dedicated template in `src/components/templates/` and a `case` in `[...rest]/page.jsx` (otherwise `EntryTemplate` is used).
+
+### Add a language
+Add the code to `SUPPORTED_LANGS` and `LOCALE_MAP` in `src/config/index.js` (codes must match WPML/Polylang). Every route, the sitemap and the `lang=` query on WP requests follow automatically.
+
+## Local development
+
+Node 20.9+.
 
 ```bash
-cd frontend
-cp .env.example .env.local   # fill in values
+cp .env.example .env.local   # fill in
 npm install
 npm run dev                  # http://localhost:3000
+npm run lint
 ```
+
+## Vercel
+
+- **Root Directory:** leave **empty** (the app is at the repo root — no `frontend/` folder).
+- **Environment variables:**
 
 | Variable | Value |
 |---|---|
-| `WORDPRESS_URL` | `https://gomostaging.com/ssl` (no trailing slash) |
-| `SITE_URL` | optional — your site URL, e.g. `https://ssl.vercel.app`; defaults to the Vercel production URL. Not secret, no need to mark Sensitive |
-| `REVALIDATE_SECRET` | same as `HEADLESS_REVALIDATE_SECRET` |
-| `PREVIEW_SECRET` | same as `HEADLESS_PREVIEW_SECRET` |
-| `WORDPRESS_PREVIEW_USER` | the preview user's username |
-| `WORDPRESS_APP_PASSWORD` | the Application Password (spaces are fine, keep the quotes) |
-| `WP_REVALIDATE_SECONDS` | optional, default `3600` |
+| `NEXT_PUBLIC_WP_BASE` | `https://gomostaging.com/ssl/wp-json` |
+| `SITE_URL` | optional, e.g. `https://sslsite.vercel.app` (defaults to the production domain) |
+| `REVALIDATE_SECRET` | same as `HEADLESS_REVALIDATE_SECRET` in wp-config.php |
+| `PREVIEW_SECRET` | same as `HEADLESS_PREVIEW_SECRET` in wp-config.php |
+| `WP_API_USER` | WordPress username for previews (e.g. `Gomo_dev`) |
+| `WP_API_PASS` | that user's Application Password |
 
-> For the revalidation webhook and preview button to reach your machine during local dev, point `HEADLESS_FRONTEND_URL` at a tunnel (e.g. `ngrok http 3000`) on a local/staging WP — not on production.
+The older names `WORDPRESS_URL`, `WORDPRESS_PREVIEW_USER` and `WORDPRESS_APP_PASSWORD` still work as fallbacks.
+`/robots.txt` blocks indexing on Vercel preview deployments automatically.
 
-## 3. Deploy to Vercel
+## WordPress setup
 
-1. Vercel → **Add New Project** → import `Development-gomo/ssl` → set **Root Directory** to `frontend` (framework is detected as Next.js).
-2. Add all variables above under **Settings → Environment Variables** (Production; add Preview too if you use preview deployments, pointing at a staging WP if you have one).
-3. Deploy, then add your domain and set `HEADLESS_FRONTEND_URL` in `wp-config.php` to it.
-4. Test: edit a page in WP and update → refresh the live page. Click **Preview** on a draft → you should see the yellow preview banner.
-
-`robots.ts` automatically blocks indexing on non-production Vercel deployments.
-
-**Build note:** the build fetches all pages/posts for `generateStaticParams`. If WP is unreachable during a build it still succeeds and pages render on first request instead.
-
-## 4. Extending
-
-### Add a custom post type
-1. Register it with `show_in_rest => true` and a `rest_base` (in the mu-plugin, your theme, or CPT UI/ACF — then delete the example `project` block).
-2. Add it to `frontend/lib/config.ts`:
-   ```ts
-   export const POST_TYPES = {
-     pages: { route: "" },
-     posts: { route: "/blog" },
-     projects: { route: "/projects" },
-     services: { route: "/services" },   // ← new
-   } as const;
+1. Settings → Permalinks → *Post name*.
+2. Plugins: **ACF Pro**, **Headless Bridge** (`wordpress/headless-bridge.zip`), optionally Yoast SEO and Redirection.
+3. `wp-config.php`:
+   ```php
+   define( 'HEADLESS_FRONTEND_URL', 'https://sslsite.vercel.app' );
+   define( 'HEADLESS_REVALIDATE_SECRET', '…' );
+   define( 'HEADLESS_PREVIEW_SECRET', '…' );
    ```
-3. Copy `app/projects/` to `app/services/` and change `"projects"` to `"services"` in both files.
-
-Previews and revalidation pick it up automatically (they're keyed off `POST_TYPES`).
-
-### Add an ACF layout
-1. Add the layout to the flexible content field in ACF (e.g. name `testimonials`).
-2. Create `components/blocks/Testimonials.tsx` — props are the layout's sub-field names.
-3. Register it in `components/blocks/FlexibleContent.tsx`:
-   ```ts
-   const LAYOUTS = { hero: Hero, text_media: TextMedia, cta: Cta, testimonials: Testimonials };
-   ```
-   In development, layouts without a component show a red "Missing component" box; in production they're skipped.
-
-### Other things you may want
-- **Forms:** Contact Form 7 / Gravity Forms both have REST submit endpoints; post to them from a Server Action so no keys reach the browser.
-- **Redirects:** export Yoast/Redirection rules into `next.config.ts` `redirects()`.
-- **Tailwind / your design system:** replace `app/globals.css`.
-- **Lock down the REST API** (optional): user enumeration via `/wp/v2/users` can be disabled with a small filter or a security plugin; the frontend doesn't need it.
+4. ACF → Tools → Import → `wordpress/acf-page-builder-import.json`.
+5. Settings → Reading → static front page; Appearance → Menus → *Primary* and *Footer*.
 
 ## Troubleshooting
 
 | Symptom | Check |
 |---|---|
-| `acf` is `[]` in REST responses | Field group → *Show in REST API* is off, or the post has no field values. |
-| Images error with "hostname not configured" | `WORDPRESS_URL` must match the host serving `/wp-content/uploads/` (CDN offload? add its host to `next.config.ts` `remotePatterns`). |
-| Updates don't appear (SiteGround) | `wpFetch` sends the `wpSGCacheBypass` cookie so SiteGround's cache never serves the API stale content to Next.js. |
-| Updates don't appear | Check `HEADLESS_FRONTEND_URL` / secrets match; Vercel → Logs for `/api/revalidate` (401 = secret mismatch). Hosts that block outgoing requests will also block the webhook. |
-| REST calls with an Application Password return `rest_not_logged_in` | The host strips the `Authorization` header. The bridge plugin (v1.1+) also accepts `X-Authorization`, which the frontend sends automatically. |
-| Preview shows 404 | Cookie blocked (preview must be opened on the frontend domain), wrong `PREVIEW_SECRET`, or the Application Password user can't read drafts (use Editor role). |
-| `/wp-json/` returns 404 | Permalinks set to *Plain*, or a security plugin is blocking the REST API. |
+| Saving in WP doesn't update the site | `HEADLESS_FRONTEND_URL` and the secrets match; Vercel → Logs for `/api/revalidate` (401 = secret mismatch). |
+| `acf` is `[]` in REST responses | The field group's *Show in REST API* is off, or the entry has no field values. |
+| Preview shows 404 | `WP_API_USER` / `WP_API_PASS` wrong, or the cookie was blocked (open the preview on the frontend domain). |
+| REST calls with an Application Password return `rest_not_logged_in` | The host strips `Authorization`; the bridge plugin (v1.1+) also reads `X-Authorization`, which the frontend sends. |
+| Unknown ACF layout shows a red box (dev only) | Add its component to `PageBuilder.jsx`. |
