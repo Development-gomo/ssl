@@ -1,0 +1,82 @@
+/* Minimal base styles — replace with your design system / Tailwind as needed. */
+:root {
+  --bg: #ffffff;
+  --fg: #16181d;
+  --muted: #5d6470;
+  --line: #e6e8ec;
+  --accent: #2f54eb;
+  --accent-fg: #ffffff;
+  --max: 1100px;
+  --radius: 10px;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 17px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+img { max-width: 100%; height: auto; display: block; }
+a { color: var(--accent); }
+h1, h2, h3 { line-height: 1.2; letter-spacing: -0.01em; }
+h1 { font-size: clamp(2rem, 4vw, 3rem); margin: 0 0 0.5em; }
+
+.container { width: 100%; max-width: var(--max); margin: 0 auto; padding: 0 20px; }
+main { min-height: 60vh; }
+
+/* Header / footer */
+.site-header { border-bottom: 1px solid var(--line); }
+.header-inner, .footer-inner { display: flex; align-items: center; justify-content: space-between; gap: 24px; min-height: 68px; flex-wrap: wrap; }
+.logo { font-weight: 700; color: var(--fg); text-decoration: none; font-size: 1.15rem; }
+nav ul { list-style: none; display: flex; gap: 22px; margin: 0; padding: 0; flex-wrap: wrap; }
+nav a { color: var(--fg); text-decoration: none; }
+nav a:hover { color: var(--accent); }
+.has-children { position: relative; }
+.submenu { display: none !important; position: absolute; top: 100%; left: -14px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 14px !important; flex-direction: column; gap: 8px !important; min-width: 200px; z-index: 10; }
+.has-children:hover .submenu, .has-children:focus-within .submenu { display: flex !important; }
+.site-footer { border-top: 1px solid var(--line); margin-top: 80px; color: var(--muted); font-size: 0.95rem; }
+
+/* Entries */
+.entry-header { padding-top: 56px; padding-bottom: 8px; }
+.meta { color: var(--muted); }
+.entry-image { border-radius: var(--radius); margin: 16px 0 32px; }
+.entry-content { max-width: 760px; padding-bottom: 40px; }
+.prose > * + * { margin-top: 1em; }
+.prose img { border-radius: var(--radius); }
+.prose figure { margin: 1.5em 0; }
+.prose .alignwide, .prose .alignfull { max-width: none; }
+
+/* ACF blocks */
+.block { margin: 64px auto; }
+.hero { position: relative; margin-top: 0; min-height: 60vh; display: flex; align-items: center; background: var(--fg); color: #fff; overflow: hidden; }
+.hero-bg { object-fit: cover; opacity: 0.45; }
+.hero-inner { position: relative; padding-top: 80px; padding-bottom: 80px; }
+.lead { font-size: 1.25rem; max-width: 640px; }
+.text-media { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center; }
+.text-media.reverse > :first-child { order: 2; }
+.text-media img { border-radius: var(--radius); }
+.cta { background: var(--accent); color: var(--accent-fg); padding: 64px 0; text-align: center; }
+.missing-layout { margin: 24px auto; max-width: var(--max); padding: 16px; border: 2px dashed #e5484d; color: #e5484d; }
+
+.button { display: inline-block; background: var(--accent); color: var(--accent-fg); padding: 12px 22px; border-radius: 999px; text-decoration: none; font-weight: 600; }
+.button-light { background: #fff; color: var(--accent); }
+
+/* Archives */
+.archive { padding-top: 56px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 28px; }
+.card { display: block; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; color: inherit; text-decoration: none; transition: transform .15s, box-shadow .15s; }
+.card:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(0,0,0,.07); }
+.card img { width: 100%; aspect-ratio: 16/9; object-fit: cover; }
+.card-body { padding: 18px 20px 22px; }
+.card h3 { margin: 0 0 8px; font-size: 1.15rem; }
+.card p { margin: 0; color: var(--muted); font-size: 0.95rem; }
+.pagination { display: flex; justify-content: space-between; align-items: center; margin-top: 40px; color: var(--muted); }
+
+.preview-banner { background: #fff4d6; border-bottom: 1px solid #f0d58a; padding: 10px 20px; text-align: center; font-size: 0.95rem; }
+
+@media (max-width: 768px) {
+  .text-media { grid-template-columns: 1fr; gap: 24px; }
+  .text-media.reverse > :first-child { order: 0; }
+}
